@@ -1,4 +1,4 @@
-"""GloVe Embeddings + bi-LSTM + CRF"""
+"""GloVe Embeddings + chars bi-LSTM + bi-LSTM + CRF"""
 
 __author__ = "Guillaume Genthial"
 
@@ -27,7 +27,13 @@ def parse_fn(line_words, line_tags):
     words = [w.encode() for w in line_words.strip().split()]
     tags = [t.encode() for t in line_tags.strip().split()]
     assert len(words) == len(tags), "Words and tags lengths don't match"
-    return (words, len(words)), tags
+
+    # Chars
+    chars = [[c.encode() for c in w] for w in line_words.strip().split()]
+    lengths = [len(c) for c in chars]
+    max_len = max(lengths)
+    chars = [c + [b'<pad>'] * (max_len - l) for c, l in zip(chars, lengths)]
+    return ((words, len(words)), (chars, lengths)), tags
 
 
 def generator_fn(words, tags):
@@ -38,10 +44,15 @@ def generator_fn(words, tags):
 
 def input_fn(words, tags, params=None, shuffle_and_repeat=False):
     params = params if params is not None else {}
-    shapes = (([None], ()), [None])
-    types = ((tf.string, tf.int32), tf.string)
-    defaults = (('<pad>', 0), 'O')
-
+    shapes = ((([None], ()),              # (words, nwords)
+              ([None, None], [None])),    # (chars, nchars)
+              [None])                     # tags
+    types = (((tf.string, tf.int32),
+             (tf.string, tf.int32)),
+             tf.string)
+    defaults = ((('<pad>', 0),
+                ('<pad>', 0)),
+                'O')
     dataset = tf.data.Dataset.from_generator(
         functools.partial(generator_fn, words, tags),
         output_shapes=shapes, output_types=types)
@@ -58,24 +69,54 @@ def input_fn(words, tags, params=None, shuffle_and_repeat=False):
 def model_fn(features, labels, mode, params):
     # Read vocabs and inputs
     dropout = params['dropout']
-    words, nwords = features
+    (words, nwords), (chars, nchars) = features
     training = (mode == tf.estimator.ModeKeys.TRAIN)
     vocab_words = tf.contrib.lookup.index_table_from_file(
             params['words'], num_oov_buckets=params['num_oov_buckets'])
+    vocab_chars = tf.contrib.lookup.index_table_from_file(
+            params['chars'], num_oov_buckets=params['num_oov_buckets'])
     with Path(params['tags']).open() as f:
         indices = [idx for idx, tag in enumerate(f) if tag.strip() != 'O']
-        num_tags = len(indices) + params['num_oov_buckets']
+        num_tags = len(indices) + 1
+    with Path(params['chars']).open() as f:
+        num_chars = sum(1 for _ in f) + params['num_oov_buckets']
+
+    # Char Embeddings
+    char_ids = vocab_chars.lookup(chars)
+    variable = tf.get_variable(
+        'chars', [num_chars, params['dim_chars']], tf.float32)
+    char_embeddings = tf.nn.embedding_lookup(variable, char_ids)
+    char_embeddings = tf.layers.dropout(char_embeddings, rate=dropout,
+                                        training=training)
+
+    # Char LSTM
+    dim_words = tf.shape(char_embeddings)[1]
+    dim_chars = tf.shape(char_embeddings)[2]
+    flat = tf.reshape(char_embeddings, [-1, dim_chars, params['dim_chars']])
+    t = tf.transpose(flat, perm=[1, 0, 2])
+    lstm_cell_fw = tf.contrib.rnn.LSTMBlockFusedCell(params['char_lstm_size'])
+    lstm_cell_bw = tf.contrib.rnn.LSTMBlockFusedCell(params['char_lstm_size'])
+    lstm_cell_bw = tf.contrib.rnn.TimeReversedFusedRNN(lstm_cell_bw)
+    _, (_, output_fw) = lstm_cell_fw(t, dtype=tf.float32,
+                                     sequence_length=tf.reshape(nchars, [-1]))
+    _, (_, output_bw) = lstm_cell_bw(t, dtype=tf.float32,
+                                     sequence_length=tf.reshape(nchars, [-1]))
+    output = tf.concat([output_fw, output_bw], axis=-1)
+    char_embeddings = tf.reshape(output, [-1, dim_words, 50])
 
     # Word Embeddings
     word_ids = vocab_words.lookup(words)
     glove = np.load(params['glove'])['embeddings']  # np.array
     variable = np.vstack([glove, [[0.]*params['dim']]])
     variable = tf.Variable(variable, dtype=tf.float32, trainable=False)
-    embeddings = tf.nn.embedding_lookup(variable, word_ids)
+    word_embeddings = tf.nn.embedding_lookup(variable, word_ids)
+
+    # Concatenate Word and Char Embeddings
+    embeddings = tf.concat([word_embeddings, char_embeddings], axis=-1)
     embeddings = tf.layers.dropout(embeddings, rate=dropout, training=training)
 
     # LSTM
-    t = tf.transpose(embeddings, perm=[1, 0, 2])
+    t = tf.transpose(embeddings, perm=[1, 0, 2])  # Need time-major
     lstm_cell_fw = tf.contrib.rnn.LSTMBlockFusedCell(params['lstm_size'])
     lstm_cell_bw = tf.contrib.rnn.LSTMBlockFusedCell(params['lstm_size'])
     lstm_cell_bw = tf.contrib.rnn.TimeReversedFusedRNN(lstm_cell_bw)
@@ -135,11 +176,13 @@ if __name__ == '__main__':
     DATADIR = '../data/conll2003'
     params = {
         'dim': 300,
+        'dim_chars': 100,
         'dropout': 0.5,
         'num_oov_buckets': 1,
         'epochs': 25,
         'batch_size': 20,
         'buffer': 15000,
+        'char_lstm_size': 25,
         'lstm_size': 100,
         'words': str(Path(DATADIR, 'vocab.words.txt')),
         'chars': str(Path(DATADIR, 'vocab.chars.txt')),
@@ -177,7 +220,7 @@ if __name__ == '__main__':
             golds_gen = generator_fn(fwords(name), ftags(name))
             preds_gen = estimator.predict(test_inpf)
             for golds, preds in zip(golds_gen, preds_gen):
-                ((words, _), tags) = golds
+                ((words, _), (_, _)), tags = golds
                 for word, tag, tag_pred in zip(words, tags, preds['tags']):
                     f.write(b' '.join([word, tag, tag_pred]) + b'\n')
                 f.write(b'\n')
