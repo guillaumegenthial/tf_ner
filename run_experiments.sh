@@ -1,4 +1,4 @@
-cd lstm_crf
+cd lstm_crf_ema
 pwd
 
 python main.py
@@ -28,7 +28,7 @@ python main.py
 mv results results5
 
 cd ..
-cd chars_lstm_lstm_crf
+cd chars_lstm_lstm_crf_ema
 pwd
 
 python main.py
@@ -58,7 +58,7 @@ python main.py
 mv results results5
 
 cd ..
-cd chars_conv_lstm_crf
+cd chars_conv_lstm_crf_ema
 pwd
 
 python main.py

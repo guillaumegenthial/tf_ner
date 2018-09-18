@@ -1,4 +1,4 @@
-"""GloVe Embeddings + chars conv and max pooling + bi-LSTM + CRF"""
+"""GloVe Embeddings + bi-LSTM + CRF"""
 
 __author__ = "Guillaume Genthial"
 
@@ -11,8 +11,6 @@ import sys
 import numpy as np
 import tensorflow as tf
 from tf_metrics import precision, recall, f1
-
-from masked_conv import masked_conv1d_and_max
 
 # Logging
 Path('results').mkdir(exist_ok=True)
@@ -29,13 +27,7 @@ def parse_fn(line_words, line_tags):
     words = [w.encode() for w in line_words.strip().split()]
     tags = [t.encode() for t in line_tags.strip().split()]
     assert len(words) == len(tags), "Words and tags lengths don't match"
-
-    # Chars
-    chars = [[c.encode() for c in w] for w in line_words.strip().split()]
-    lengths = [len(c) for c in chars]
-    max_len = max(lengths)
-    chars = [c + [b'<pad>'] * (max_len - l) for c, l in zip(chars, lengths)]
-    return ((words, len(words)), (chars, lengths)), tags
+    return (words, len(words)), tags
 
 
 def generator_fn(words, tags):
@@ -46,15 +38,10 @@ def generator_fn(words, tags):
 
 def input_fn(words, tags, params=None, shuffle_and_repeat=False):
     params = params if params is not None else {}
-    shapes = ((([None], ()),               # (words, nwords)
-               ([None, None], [None])),    # (chars, nchars)
-              [None])                      # tags
-    types = (((tf.string, tf.int32),
-              (tf.string, tf.int32)),
-             tf.string)
-    defaults = ((('<pad>', 0),
-                 ('<pad>', 0)),
-                'O')
+    shapes = (([None], ()), [None])
+    types = ((tf.string, tf.int32), tf.string)
+    defaults = (('<pad>', 0), 'O')
+
     dataset = tf.data.Dataset.from_generator(
         functools.partial(generator_fn, words, tags),
         output_shapes=shapes, output_types=types)
@@ -68,69 +55,86 @@ def input_fn(words, tags, params=None, shuffle_and_repeat=False):
     return dataset
 
 
-def model_fn(features, labels, mode, params):
+def graph_fn(features, labels, mode, params, reuse=None, getter=None):
     # Read vocabs and inputs
-    dropout = params['dropout']
-    (words, nwords), (chars, nchars) = features
+    num_tags = params['num_tags']
+    words, nwords = features
     training = (mode == tf.estimator.ModeKeys.TRAIN)
-    vocab_words = tf.contrib.lookup.index_table_from_file(
-        params['words'], num_oov_buckets=params['num_oov_buckets'])
-    vocab_chars = tf.contrib.lookup.index_table_from_file(
-        params['chars'], num_oov_buckets=params['num_oov_buckets'])
+    with tf.variable_scope('graph', reuse=reuse, custom_getter=getter):
+        # Read vocabs and inputs
+        dropout = params['dropout']
+        words, nwords = features
+        training = (mode == tf.estimator.ModeKeys.TRAIN)
+        vocab_words = tf.contrib.lookup.index_table_from_file(
+            params['words'], num_oov_buckets=params['num_oov_buckets'])
+
+        # Word Embeddings
+        word_ids = vocab_words.lookup(words)
+        glove = np.load(params['glove'])['embeddings']  # np.array
+        variable = np.vstack([glove, [[0.]*params['dim']]])
+        variable = tf.Variable(variable, dtype=tf.float32, trainable=False)
+        embeddings = tf.nn.embedding_lookup(variable, word_ids)
+        embeddings = tf.layers.dropout(embeddings, rate=dropout, training=training)
+
+        # LSTM
+        t = tf.transpose(embeddings, perm=[1, 0, 2])
+        lstm_cell_fw = tf.contrib.rnn.LSTMBlockFusedCell(params['lstm_size'])
+        lstm_cell_bw = tf.contrib.rnn.LSTMBlockFusedCell(params['lstm_size'])
+        lstm_cell_bw = tf.contrib.rnn.TimeReversedFusedRNN(lstm_cell_bw)
+        output_fw, _ = lstm_cell_fw(t, dtype=tf.float32, sequence_length=nwords)
+        output_bw, _ = lstm_cell_bw(t, dtype=tf.float32, sequence_length=nwords)
+        output = tf.concat([output_fw, output_bw], axis=-1)
+        output = tf.transpose(output, perm=[1, 0, 2])
+        output = tf.layers.dropout(output, rate=dropout, training=training)
+
+        # CRF
+        logits = tf.layers.dense(output, num_tags)
+        crf_params = tf.get_variable("crf", [num_tags, num_tags], dtype=tf.float32)
+
+    return logits, crf_params
+
+
+def ema_getter(ema):
+
+    def _ema_getter(getter, name, *args, **kwargs):
+        var = getter(name, *args, **kwargs)
+        ema_var = ema.average(var)
+        return ema_var if ema_var else var
+
+    return _ema_getter
+
+
+def model_fn(features, labels, mode, params):
     with Path(params['tags']).open() as f:
         indices = [idx for idx, tag in enumerate(f) if tag.strip() != 'O']
         num_tags = len(indices) + 1
-    with Path(params['chars']).open() as f:
-        num_chars = sum(1 for _ in f) + params['num_oov_buckets']
+        params['num_tags'] = num_tags
 
-    # Char Embeddings
-    char_ids = vocab_chars.lookup(chars)
-    variable = tf.get_variable(
-        'chars', [num_chars + 1, params['dim_chars']], tf.float32)
-    char_embeddings = tf.nn.embedding_lookup(variable, char_ids)
-    char_embeddings = tf.layers.dropout(char_embeddings, rate=dropout,
-                                        training=training)
-
-    # Char LSTM
-    weights = tf.sequence_mask(nchars)
-    char_embeddings = masked_conv1d_and_max(
-        char_embeddings, weights, params['filters'], params['kernel_size'])
-
-    # Word Embeddings
-    word_ids = vocab_words.lookup(words)
-    glove = np.load(params['glove'])['embeddings']  # np.array
-    variable = np.vstack([glove, [[0.] * params['dim']]])
-    variable = tf.Variable(variable, dtype=tf.float32, trainable=False)
-    word_embeddings = tf.nn.embedding_lookup(variable, word_ids)
-
-    # Concatenate Word and Char Embeddings
-    embeddings = tf.concat([word_embeddings, char_embeddings], axis=-1)
-    embeddings = tf.layers.dropout(embeddings, rate=dropout, training=training)
-
-    # LSTM
-    t = tf.transpose(embeddings, perm=[1, 0, 2])  # Need time-major
-    lstm_cell_fw = tf.contrib.rnn.LSTMBlockFusedCell(params['lstm_size'])
-    lstm_cell_bw = tf.contrib.rnn.LSTMBlockFusedCell(params['lstm_size'])
-    lstm_cell_bw = tf.contrib.rnn.TimeReversedFusedRNN(lstm_cell_bw)
-    output_fw, _ = lstm_cell_fw(t, dtype=tf.float32, sequence_length=nwords)
-    output_bw, _ = lstm_cell_bw(t, dtype=tf.float32, sequence_length=nwords)
-    output = tf.concat([output_fw, output_bw], axis=-1)
-    output = tf.transpose(output, perm=[1, 0, 2])
-    output = tf.layers.dropout(output, rate=dropout, training=training)
-
-    # CRF
-    logits = tf.layers.dense(output, num_tags)
-    crf_params = tf.get_variable("crf", [num_tags, num_tags], dtype=tf.float32)
+    # Graph
+    words, nwords = features
+    logits, crf_params = graph_fn(features, labels, mode, params)
     pred_ids, _ = tf.contrib.crf.crf_decode(logits, crf_params, nwords)
+
+    # Moving Average
+    variables = tf.get_collection('trainable_variables', 'graph')
+    ema = tf.train.ExponentialMovingAverage(0.999)
+    ema_op = ema.apply(variables)
+    logits_ema, crf_params_ema = graph_fn(
+        features, labels, mode, params, reuse=True, getter=ema_getter(ema))
+    pred_ids_ema, _ = tf.contrib.crf.crf_decode(
+        logits_ema, crf_params_ema, nwords)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
         # Predictions
         reverse_vocab_tags = tf.contrib.lookup.index_to_string_table_from_file(
             params['tags'])
         pred_strings = reverse_vocab_tags.lookup(tf.to_int64(pred_ids))
+        pred_strings_ema = reverse_vocab_tags.lookup(tf.to_int64(pred_ids_ema))
         predictions = {
             'pred_ids': pred_ids,
-            'tags': pred_strings
+            'tags': pred_strings,
+            'pred_ids_ema': pred_ids_ema,
+            'tags_ema': pred_strings_ema,
         }
         return tf.estimator.EstimatorSpec(mode, predictions=predictions)
     else:
@@ -145,9 +149,13 @@ def model_fn(features, labels, mode, params):
         weights = tf.sequence_mask(nwords)
         metrics = {
             'acc': tf.metrics.accuracy(tags, pred_ids, weights),
-            'precision': precision(tags, pred_ids, num_tags, indices, weights),
-            'recall': recall(tags, pred_ids, num_tags, indices, weights),
+            'acc_ema': tf.metrics.accuracy(tags, pred_ids_ema, weights),
+            'pr': precision(tags, pred_ids, num_tags, indices, weights),
+            'pr_ema': precision(tags, pred_ids_ema, num_tags, indices, weights),
+            'rc': recall(tags, pred_ids, num_tags, indices, weights),
+            'rc_ema': recall(tags, pred_ids_ema, num_tags, indices, weights),
             'f1': f1(tags, pred_ids, num_tags, indices, weights),
+            'f1_ema': f1(tags, pred_ids_ema, num_tags, indices, weights),
         }
         for metric_name, op in metrics.items():
             tf.summary.scalar(metric_name, op[1])
@@ -158,7 +166,9 @@ def model_fn(features, labels, mode, params):
 
         elif mode == tf.estimator.ModeKeys.TRAIN:
             train_op = tf.train.AdamOptimizer().minimize(
-                loss, global_step=tf.train.get_or_create_global_step())
+                loss, global_step=tf.train.get_or_create_global_step(),
+                var_list=variables)
+            train_op = tf.group([train_op, ema_op])
             return tf.estimator.EstimatorSpec(
                 mode, loss=loss, train_op=train_op)
 
@@ -167,15 +177,12 @@ if __name__ == '__main__':
     # Params
     DATADIR = '../data/conll2003'
     params = {
-        'dim_chars': 100,
         'dim': 300,
         'dropout': 0.5,
         'num_oov_buckets': 1,
         'epochs': 25,
         'batch_size': 20,
         'buffer': 15000,
-        'filters': 50,
-        'kernel_size': 3,
         'lstm_size': 100,
         'words': str(Path(DATADIR, 'vocab.words.txt')),
         'chars': str(Path(DATADIR, 'vocab.chars.txt')),
@@ -213,7 +220,7 @@ if __name__ == '__main__':
             golds_gen = generator_fn(fwords(name), ftags(name))
             preds_gen = estimator.predict(test_inpf)
             for golds, preds in zip(golds_gen, preds_gen):
-                ((words, _), (_, _)), tags = golds
+                ((words, _), tags) = golds
                 for word, tag, tag_pred in zip(words, tags, preds['tags']):
                     f.write(b' '.join([word, tag, tag_pred]) + b'\n')
                 f.write(b'\n')

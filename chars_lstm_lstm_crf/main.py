@@ -16,9 +16,9 @@ from tf_metrics import precision, recall, f1
 Path('results').mkdir(exist_ok=True)
 tf.logging.set_verbosity(logging.INFO)
 handlers = [
-        logging.FileHandler('results/main.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
+    logging.FileHandler('results/main.log'),
+    logging.StreamHandler(sys.stdout)
+]
 logging.getLogger('tensorflow').handlers = handlers
 
 
@@ -37,21 +37,21 @@ def parse_fn(line_words, line_tags):
 
 
 def generator_fn(words, tags):
-    with Path(words).open('r') as fwords, Path(tags).open('r') as ftags:
-        for line_words, line_tags in zip(fwords, ftags):
+    with Path(words).open('r') as f_words, Path(tags).open('r') as f_tags:
+        for line_words, line_tags in zip(f_words, f_tags):
             yield parse_fn(line_words, line_tags)
 
 
 def input_fn(words, tags, params=None, shuffle_and_repeat=False):
     params = params if params is not None else {}
-    shapes = ((([None], ()),              # (words, nwords)
-              ([None, None], [None])),    # (chars, nchars)
-              [None])                     # tags
+    shapes = ((([None], ()),               # (words, nwords)
+               ([None, None], [None])),    # (chars, nchars)
+              [None])                      # tags
     types = (((tf.string, tf.int32),
-             (tf.string, tf.int32)),
+              (tf.string, tf.int32)),
              tf.string)
     defaults = ((('<pad>', 0),
-                ('<pad>', 0)),
+                 ('<pad>', 0)),
                 'O')
     dataset = tf.data.Dataset.from_generator(
         functools.partial(generator_fn, words, tags),
@@ -72,9 +72,9 @@ def model_fn(features, labels, mode, params):
     (words, nwords), (chars, nchars) = features
     training = (mode == tf.estimator.ModeKeys.TRAIN)
     vocab_words = tf.contrib.lookup.index_table_from_file(
-            params['words'], num_oov_buckets=params['num_oov_buckets'])
+        params['words'], num_oov_buckets=params['num_oov_buckets'])
     vocab_chars = tf.contrib.lookup.index_table_from_file(
-            params['chars'], num_oov_buckets=params['num_oov_buckets'])
+        params['chars'], num_oov_buckets=params['num_oov_buckets'])
     with Path(params['tags']).open() as f:
         indices = [idx for idx, tag in enumerate(f) if tag.strip() != 'O']
         num_tags = len(indices) + 1
@@ -107,7 +107,7 @@ def model_fn(features, labels, mode, params):
     # Word Embeddings
     word_ids = vocab_words.lookup(words)
     glove = np.load(params['glove'])['embeddings']  # np.array
-    variable = np.vstack([glove, [[0.]*params['dim']]])
+    variable = np.vstack([glove, [[0.] * params['dim']]])
     variable = tf.Variable(variable, dtype=tf.float32, trainable=False)
     word_embeddings = tf.nn.embedding_lookup(variable, word_ids)
 
@@ -157,8 +157,8 @@ def model_fn(features, labels, mode, params):
             'recall': recall(tags, pred_ids, num_tags, indices, weights),
             'f1': f1(tags, pred_ids, num_tags, indices, weights),
         }
-        for name, op in metrics.items():
-            tf.summary.scalar(name, op[1])
+        for metric_name, op in metrics.items():
+            tf.summary.scalar(metric_name, op[1])
 
         if mode == tf.estimator.ModeKeys.EVAL:
             return tf.estimator.EstimatorSpec(
