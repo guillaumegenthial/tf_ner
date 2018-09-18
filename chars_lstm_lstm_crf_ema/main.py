@@ -250,23 +250,24 @@ if __name__ == '__main__':
     estimator = tf.estimator.Estimator(model_fn, 'results/model', cfg, params)
     Path(estimator.eval_dir()).mkdir(parents=True, exist_ok=True)
     hook = tf.contrib.estimator.stop_if_no_increase_hook(
-        estimator, 'f1', 500, min_steps=8000, run_every_secs=120)
+        estimator, 'f1_ema', 500, min_steps=8000, run_every_secs=120)
     train_spec = tf.estimator.TrainSpec(input_fn=train_inpf, hooks=[hook])
     eval_spec = tf.estimator.EvalSpec(input_fn=eval_inpf, throttle_secs=120)
     tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
 
     # Write predictions to file
-    def write_predictions(name):
+    def write_predictions(name, mode):
         Path('results/score').mkdir(parents=True, exist_ok=True)
-        with Path('results/score/{}.preds.txt'.format(name)).open('wb') as f:
+        with Path('results/score/{}.{}.preds.txt'.format(name, mode)).open('wb') as f:
             test_inpf = functools.partial(input_fn, fwords(name), ftags(name))
             golds_gen = generator_fn(fwords(name), ftags(name))
             preds_gen = estimator.predict(test_inpf)
             for golds, preds in zip(golds_gen, preds_gen):
                 ((words, _), (_, _)), tags = golds
-                for word, tag, tag_pred in zip(words, tags, preds['tags']):
+                for word, tag, tag_pred in zip(words, tags, preds[mode]):
                     f.write(b' '.join([word, tag, tag_pred]) + b'\n')
                 f.write(b'\n')
 
     for name in ['train', 'testa', 'testb']:
-        write_predictions(name)
+        for mode in ['tags', 'tags_ema']:
+            write_predictions(name, mode)

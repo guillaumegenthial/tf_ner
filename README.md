@@ -14,7 +14,7 @@ The script [`lstm_crf/main.py`](https://github.com/guillaumegenthial/tf_ner/blob
 
 You need __python3__ -- If you haven't switched yet, do it.
 
-You need to install [`tf_metrics` ](https://github.com/guillaumegenthial/tf_metrics).
+You need to install [`tf_metrics` ](https://github.com/guillaumegenthial/tf_metrics) (multi-class precision, recall and f1 metrics for Tensorflow).
 
 ```
 git clone https://github.com/guillaumegenthial/tf_metrics.git
@@ -58,7 +58,7 @@ For each model, we run 5 experiments
 - Train on `train` only
 - Early stopping on `testa`
 - Select best of 5 on the perfomance on `testa`
-- Report mean and standard deviation
+- Report F1 score mean and standard deviation
 
 ---
 
@@ -70,9 +70,9 @@ __Architecture__
 2. Bi-LSTM
 3. CRF
 
-__Related Paper__: [Bidirectional LSTM-CRF Models for Sequence Tagging](https://arxiv.org/abs/1508.01991) by Huang, Xu and Yu
+__Related Paper__ [Bidirectional LSTM-CRF Models for Sequence Tagging](https://arxiv.org/abs/1508.01991) by Huang, Xu and Yu
 
-__Training time__: ~ 20 min
+__Training time__ ~ 20 min
 
 || `train` | `testa` | `testb` | Paper, `testb` |
 |---|---|---|---|---|
@@ -93,9 +93,9 @@ __Architecture__
 4. Bi-LSTM
 5. CRF
 
-__Related Paper__: [Neural Architectures for Named Entity Recognition](https://arxiv.org/abs/1603.01360) by Lample et al.
+__Related Paper__ [Neural Architectures for Named Entity Recognition](https://arxiv.org/abs/1603.01360) by Lample et al.
 
-__Training time__: ~ 35 min
+__Training time__ ~ 35 min
 
 || `train` | `testa` | `testb` | Paper, `testb` |
 |---|---|---|---|---|
@@ -115,9 +115,9 @@ __Architecture__
 4. Bi-LSTM
 5. CRF
 
-__Related Paper__: [End-to-end Sequence Labeling via Bi-directional LSTM-CNNs-CRF](https://arxiv.org/abs/1603.01354) by Ma et Hovy
+__Related Paper__ [End-to-end Sequence Labeling via Bi-directional LSTM-CNNs-CRF](https://arxiv.org/abs/1603.01354) by Ma et Hovy
 
-__Training time__: ~ 35 min
+__Training time__ ~ 35 min
 
 || `train` | `testa` | `testb` | Paper, `testb` |
 |---|---|---|---|---|
