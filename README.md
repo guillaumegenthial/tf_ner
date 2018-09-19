@@ -2,10 +2,10 @@
 
 Each folder contains a __standalone__, __short (~100 lines of Tensorflow)__, `main.py` that implements a neural-network based model for Named Entity Recognition (NER) using [`tf.estimator`](https://www.tensorflow.org/guide/custom_estimators) and [`tf.data`](https://www.tensorflow.org/guide/datasets).
 
-![Named Entity Recognition](ner.png)
+![Named Entity Recognition](images/ner.png)
 
 
-These implementations are __simple, efficient, and state-of-the-art__, in the sense that they do __as least as well as the results reported in the papers__. To my knowledge, *existing implementations available on the web are convoluted, outdated and not always accurate* (including my [previous work](https://github.com/guillaumegenthial/sequence_tagging)). This repo is an attempt to fix this, in the hope that it will not only trigger new ideas around NER, but more importantly make their implementation a lot easier.
+These implementations are __simple, efficient, and state-of-the-art__, in the sense that they do __as least as well as the results reported in the papers__. The best model achieves in *average* an __f1 score of 91.21__. To my knowledge, *existing implementations available on the web are convoluted, outdated and not always accurate* (including my [previous work](https://github.com/guillaumegenthial/sequence_tagging)). This repo is an attempt to fix this, in the hope that it will enable people to test and validate new ideas quickly.
 
 The script [`lstm_crf/main.py`](https://github.com/guillaumegenthial/tf_ner/blob/master/models/lstm_crf/main.py) can also be seen as a __simple introduction to Tensorflow high-level APIs [`tf.estimator`](https://www.tensorflow.org/guide/custom_estimators) and [`tf.data`](https://www.tensorflow.org/guide/datasets) applied to Natural Language Processing__.
 
@@ -19,12 +19,12 @@ You need to install [`tf_metrics` ](https://github.com/guillaumegenthial/tf_metr
 ```
 git clone https://github.com/guillaumegenthial/tf_metrics.git
 cd tf_metrics
-pip install -r requirements.txt
+pip install .
 ```
 
 ## Data Format
 
-Follow the [`data/example`](https://github.com/guillaumegenthial/tf_ner/tree/master/data/example)
+Follow the [`data/example`](https://github.com/guillaumegenthial/tf_ner/tree/master/data/example).
 
 1. For `name` in `{train, testa, testb}`, create files `{name}.words.txt` and `{name}.tags.txt` that contain one sentence per line, each
 word / tag separated by space. I recommend using the `IOBES` tagging scheme.
@@ -36,6 +36,8 @@ An example of scripts to build the `vocab` and the `glove.npz` files from the  `
 1. [`build_vocab.py`](https://github.com/guillaumegenthial/tf_ner/blob/master/data/example/build_vocab.py)
 2. [`build_glove.py`'](https://github.com/guillaumegenthial/tf_ner/blob/master/data/example/build_glove.py)
 
+![Data Format](images/data.png)
+
 If you just want to get started, once you have created your `{name}.words.txt` and `{name}.tags.txt` files, simply do
 
 ```
@@ -44,11 +46,22 @@ make download-glove
 make build
 ```
 
-(These commands will build the example dataset)
+(These commands will build the __example__ dataset)
+
+*Note that the example dataset is here for debugging purposes only and won't be of much use to train an actual model*
 
 ## Get Started
 
 Once you've produced all the required data files, simply pick one of the `main.py` scripts. Then, modify the `DATADIR` variable at the top of `main.py`.
+
+To train, evaluate and write predictions to file, run
+
+```
+cd models/lstm_crf
+python main.py
+```
+
+(These commands will train a bi-LSTM + CRF on the __example__ dataset if you haven't changed `DATADIR` in the `main.py`.)
 
 ## Models
 
