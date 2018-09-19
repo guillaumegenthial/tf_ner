@@ -14,6 +14,8 @@ from tf_metrics import precision, recall, f1
 
 from masked_conv import masked_conv1d_and_max
 
+DATADIR = '../../data/example'
+
 # Logging
 Path('results').mkdir(exist_ok=True)
 tf.logging.set_verbosity(logging.INFO)
@@ -165,7 +167,6 @@ def model_fn(features, labels, mode, params):
 
 if __name__ == '__main__':
     # Params
-    DATADIR = '../data/conll2003'
     params = {
         'dim_chars': 100,
         'dim': 300,

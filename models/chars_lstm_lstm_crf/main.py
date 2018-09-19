@@ -12,6 +12,8 @@ import numpy as np
 import tensorflow as tf
 from tf_metrics import precision, recall, f1
 
+DATADIR = '../../data/example'
+
 # Logging
 Path('results').mkdir(exist_ok=True)
 tf.logging.set_verbosity(logging.INFO)
@@ -173,7 +175,6 @@ def model_fn(features, labels, mode, params):
 
 if __name__ == '__main__':
     # Params
-    DATADIR = '../data/conll2003'
     params = {
         'dim': 300,
         'dim_chars': 100,

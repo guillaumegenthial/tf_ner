@@ -1,7 +1,8 @@
 """Build an np.array from some glove file and some vocab file
 
 You need to download `glove.840B.300d.txt` from
-https://nlp.stanford.edu/projects/glove/.
+https://nlp.stanford.edu/projects/glove/ and you need to have built
+your vocabulary first (Maybe using `build_vocab.py`)
 """
 
 __author__ = "Guillaume Genthial"

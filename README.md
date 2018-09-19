@@ -7,7 +7,7 @@ Each folder contains a __standalone__, __short (~100 lines of Tensorflow)__, `ma
 
 These implementations are __simple, efficient, and state-of-the-art__, in the sense that they do __as least as well as the results reported in the papers__. To my knowledge, *existing implementations available on the web are convoluted, outdated and not always accurate* (including my [previous work](https://github.com/guillaumegenthial/sequence_tagging)). This repo is an attempt to fix this, in the hope that it will not only trigger new ideas around NER, but more importantly make their implementation a lot easier.
 
-The script [`lstm_crf/main.py`](https://github.com/guillaumegenthial/tf_ner/blob/master/lstm_crf/main.py) can also be seen as a __simple introduction to Tensorflow high-level APIs [`tf.estimator`](https://www.tensorflow.org/guide/custom_estimators) and [`tf.data`](https://www.tensorflow.org/guide/datasets) applied to Natural Language Processing__.
+The script [`lstm_crf/main.py`](https://github.com/guillaumegenthial/tf_ner/blob/master/models/lstm_crf/main.py) can also be seen as a __simple introduction to Tensorflow high-level APIs [`tf.estimator`](https://www.tensorflow.org/guide/custom_estimators) and [`tf.data`](https://www.tensorflow.org/guide/datasets) applied to Natural Language Processing__.
 
 
 ## Install
@@ -36,6 +36,19 @@ An example of scripts to build the `vocab` and the `glove.npz` files from the  `
 1. [`build_vocab.py`](https://github.com/guillaumegenthial/tf_ner/blob/master/data/example/build_vocab.py)
 2. [`build_glove.py`'](https://github.com/guillaumegenthial/tf_ner/blob/master/data/example/build_glove.py)
 
+If you just want to get started, once you have created your `{name}.words.txt` and `{name}.tags.txt` files, simply do
+
+```
+cd data/example
+make download-glove
+make build
+```
+
+(These commands will build the example dataset)
+
+## Get Started
+
+Once you've produced all the required data files, simply pick one of the `main.py` scripts. Then, modify the `DATADIR` variable at the top of `main.py`.
 
 ## Models
 
@@ -57,8 +70,8 @@ For each model, we run 5 experiments
 
 - Train on `train` only
 - __Early stopping__ on `testa`
-- Select best of 5 on the perfomance on `testa`
-- Report __F1 score mean and standard deviation__
+- Select best of 5 on the perfomance on `testa` (token-level F1)
+- Report __F1 score mean and standard deviation__ (entity-level F1 from the official `conlleval` script)
 - Select best on `testb` for reference (but shouldn't be used for comparison as this is just overfitting on the final test set)
 
 In addition, we run 5 other experiments, keeping an __Exponential Moving Average (EMA)__ of the weights (used for evaluation) and report the best F1, mean / std.

@@ -14,6 +14,8 @@ from tf_metrics import precision, recall, f1
 
 from masked_conv import masked_conv1d_and_max
 
+DATADIR = '../../data/example'
+
 # Logging
 Path('results').mkdir(exist_ok=True)
 tf.logging.set_verbosity(logging.INFO)
@@ -210,7 +212,6 @@ def model_fn(features, labels, mode, params):
 
 if __name__ == '__main__':
     # Params
-    DATADIR = '../data/conll2003'
     params = {
         'dim_chars': 100,
         'dim': 300,
@@ -252,6 +253,7 @@ if __name__ == '__main__':
 
     # Write predictions to file
     def write_predictions(name, mode):
+        """Write predictions of dataset with name to file"""
         Path('results/score').mkdir(parents=True, exist_ok=True)
         with Path('results/score/{}.{}.preds.txt'.format(name, mode)).open('wb') as f:
             test_inpf = functools.partial(input_fn, fwords(name), ftags(name))
