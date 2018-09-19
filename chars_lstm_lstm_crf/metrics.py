@@ -1,3 +1,7 @@
+"""Metrics"""
+
+__author__ = "Guillaume Genthial"
+
 import numpy as np
 
 

@@ -47,7 +47,7 @@ Took inspiration from these papers
 
 You can also read [this blog post](https://guillaumegenthial.github.io/sequence-tagging-with-tensorflow.html).
 
-Word-vectors are not retrained to avoid any undesirable shift (explanation in [these CS224N notes](https://github.com/stanfordnlp/cs224n-winter17-notes/blob/master/notes2.pdf)).
+Word-vectors are __not retrained__ to avoid any undesirable shift (explanation in [these CS224N notes](https://github.com/stanfordnlp/cs224n-winter17-notes/blob/master/notes2.pdf)).
 
 The models are tested on the [CoNLL2003 shared task](https://www.clips.uantwerpen.be/conll2003/ner/).
 
@@ -56,9 +56,14 @@ Training times are provided for indicative purposes only. Obtained on a 2016 13-
 For each model, we run 5 experiments
 
 - Train on `train` only
-- Early stopping on `testa`
+- __Early stopping__ on `testa`
 - Select best of 5 on the perfomance on `testa`
-- Report F1 score mean and standard deviation
+- Report __F1 score mean and standard deviation__
+- Select best on `testb` for reference (but shouldn't be used for comparison as this is just overfitting on the final test set)
+
+In addition, we run 5 other experiments, keeping an __Exponential Moving Average (EMA)__ of the weights (used for evaluation) and report the best F1, mean / std.
+
+As you can see, there's no clear statistical evidence of which of the 2 character-based models is the best. EMA seems to help most of the time. Also, considering the complexity of the models and the relatively small gap in performance (0.6 F1), using the `lstm_crf` model is probably a safe bet for most of the concrete applications.
 
 ---
 
@@ -75,10 +80,13 @@ __Related Paper__ [Bidirectional LSTM-CRF Models for Sequence Tagging](https://a
 __Training time__ ~ 20 min
 
 || `train` | `testa` | `testb` | Paper, `testb` |
-|---|---|---|---|---|
-|best | 98.45 |93.81 | 90.61 |  |
-|mean ± std| 98.85 ± 0.22| 93.68 ± 0.12| __90.42__ ± 0.10| 90.10  |
-
+|---|:---:|:---:|:---:|:---:|
+|best | 98.45 |93.81 | __90.61__ |  90.10 |
+|best (EMA)| 98.82 | 94.06 | 90.43 | |
+|mean ± std| 98.85 ± 0.22| 93.68 ± 0.12| 90.42 ± 0.10|  |
+|mean ± std (EMA)| 98.71 ± 0.47 | 93.81 ± 0.24 | __90.50__ ± 0.21| |
+|abs. best |   | | 90.61 |  |
+|abs. best (EMA) | |  | 90.75 |  |
 
 
 ---
@@ -98,10 +106,13 @@ __Related Paper__ [Neural Architectures for Named Entity Recognition](https://ar
 __Training time__ ~ 35 min
 
 || `train` | `testa` | `testb` | Paper, `testb` |
-|---|---|---|---|---|
-|best| 98.81 | 94.36 | 91.02 |  |
-|mean ± std | 98.83 ± 0.27| 94.02 ± 0.26| __91.01__ ± 0.16 | 90.94 |
-
+|---|:---:|:---:|:---:|:---:|
+|best| 98.81 | 94.36 | 91.02 | 90.94 |
+|best (EMA) |98.73 | 94.50 | __91.14__ | |
+|mean ± std | 98.83 ± 0.27| 94.02 ± 0.26| 91.01 ± 0.16 |  |
+|mean ± std (EMA) | 98.51 ± 0.25| 94.20 ± 0.28| __91.21__ ± 0.05 |  |
+|abs. best |   | |91.22 | |
+|abs. best (EMA) | |   | 91.28 |  |
 
 ---
 
@@ -120,9 +131,12 @@ __Related Paper__ [End-to-end Sequence Labeling via Bi-directional LSTM-CNNs-CRF
 __Training time__ ~ 35 min
 
 || `train` | `testa` | `testb` | Paper, `testb` |
-|---|---|---|---|---|
-|best| 99.16 | 94.53 | 91.18 |  |
-|mean ± std | 98.86 ± 0.30| 94.10 ± 0.26| __91.20__ ± 0.15 | 91.21 |
-
+|---|:---:|:---:|:---:|:---:|
+|best| 99.16 | 94.53 | __91.18__ | 91.21 |
+|best (EMA) |99.44 | 94.50 | 91.17 | |
+|mean ± std | 98.86 ± 0.30| 94.10 ± 0.26| __91.20__ ± 0.15 |  |
+|mean ± std (EMA) | 98.67 ± 0.39| 94.29 ± 0.17| 91.13 ± 0.11 |  |
+|abs. best |  | | 91.42 |  |
+|abs. best (EMA) |   | | 91.22 |  |
 
 
