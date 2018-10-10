@@ -1,0 +1,2 @@
+tensorflow>=1.9
+tf_metrics
