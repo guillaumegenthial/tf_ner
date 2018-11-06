@@ -93,7 +93,7 @@ def model_fn(features, labels, mode, params):
     char_embeddings = tf.layers.dropout(char_embeddings, rate=dropout,
                                         training=training)
 
-    # Char LSTM
+    # Char 1d convolution
     weights = tf.sequence_mask(nchars)
     char_embeddings = masked_conv1d_and_max(
         char_embeddings, weights, params['filters'], params['kernel_size'])
