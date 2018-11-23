@@ -7,7 +7,7 @@ Each folder contains a __standalone__, __short (~100 lines of Tensorflow)__, `ma
 
 These implementations are __simple, efficient, and state-of-the-art__, in the sense that they do __as least as well as the results reported in the papers__. The best model achieves in *average* an __f1 score of 91.21__. To my knowledge, *existing implementations available on the web are convoluted, outdated and not always accurate* (including my [previous work](https://github.com/guillaumegenthial/sequence_tagging)). This repo is an attempt to fix this, in the hope that it will enable people to test and validate new ideas quickly.
 
-The script [`lstm_crf/main.py`](https://github.com/guillaumegenthial/tf_ner/blob/master/models/lstm_crf/main.py) can also be seen as a __simple introduction to Tensorflow high-level APIs [`tf.estimator`](https://www.tensorflow.org/guide/custom_estimators) and [`tf.data`](https://www.tensorflow.org/guide/datasets) applied to Natural Language Processing__.
+The script [`lstm_crf/main.py`](https://github.com/guillaumegenthial/tf_ner/blob/master/models/lstm_crf/main.py) can also be seen as a __simple introduction to Tensorflow high-level APIs [`tf.estimator`](https://www.tensorflow.org/guide/custom_estimators) and [`tf.data`](https://www.tensorflow.org/guide/datasets) applied to Natural Language Processing__. [Here is a longer discussion about this implementation along with an introduction to tf.estimator and tf.data](https://guillaumegenthial.github.io/introduction-tensorflow-estimator.html)
 
 
 ## Install
