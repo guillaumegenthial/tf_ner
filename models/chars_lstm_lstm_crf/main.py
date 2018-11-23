@@ -69,9 +69,14 @@ def input_fn(words, tags, params=None, shuffle_and_repeat=False):
 
 
 def model_fn(features, labels, mode, params):
+    # For serving features are a bit different
+    if isinstance(features, dict):
+        features = ((features['words'], features['nwords']),
+                    (features['chars'], features['nchars']))
+
     # Read vocabs and inputs
-    dropout = params['dropout']
     (words, nwords), (chars, nchars) = features
+    dropout = params['dropout']
     training = (mode == tf.estimator.ModeKeys.TRAIN)
     vocab_words = tf.contrib.lookup.index_table_from_file(
         params['words'], num_oov_buckets=params['num_oov_buckets'])
@@ -86,7 +91,7 @@ def model_fn(features, labels, mode, params):
     # Char Embeddings
     char_ids = vocab_chars.lookup(chars)
     variable = tf.get_variable(
-        'chars', [num_chars, params['dim_chars']], tf.float32)
+        'chars_embeddings', [num_chars, params['dim_chars']], tf.float32)
     char_embeddings = tf.nn.embedding_lookup(variable, char_ids)
     char_embeddings = tf.layers.dropout(char_embeddings, rate=dropout,
                                         training=training)

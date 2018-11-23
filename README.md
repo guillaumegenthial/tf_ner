@@ -66,6 +66,8 @@ python main.py
 
 (These commands will train a bi-LSTM + CRF on the __example__ dataset if you haven't changed `DATADIR` in the `main.py`.)
 
+__Each model subdirectory contains a breakdown of the instructions__.
+
 ## Models
 
 Took inspiration from these papers

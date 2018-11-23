@@ -88,7 +88,7 @@ def graph_fn(features, labels, mode, params, reuse=None, getter=None):
         # Char Embeddings
         char_ids = vocab_chars.lookup(chars)
         variable = tf.get_variable(
-            'chars', [num_chars, params['dim_chars']], tf.float32)
+            'chars_embeddings', [num_chars, params['dim_chars']], tf.float32)
         char_embeddings = tf.nn.embedding_lookup(variable, char_ids)
         char_embeddings = tf.layers.dropout(char_embeddings, rate=dropout,
                                             training=training)
@@ -148,6 +148,11 @@ def ema_getter(ema):
 
 
 def model_fn(features, labels, mode, params):
+    # For serving features are a bit different
+    if isinstance(features, dict):
+        features = ((features['words'], features['nwords']),
+                    (features['chars'], features['nchars']))
+
     with Path(params['tags']).open() as f:
         indices = [idx for idx, tag in enumerate(f) if tag.strip() != 'O']
         num_tags = len(indices) + 1

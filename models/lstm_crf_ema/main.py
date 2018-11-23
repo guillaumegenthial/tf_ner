@@ -107,6 +107,10 @@ def ema_getter(ema):
 
 
 def model_fn(features, labels, mode, params):
+    # For serving, features are a bit different
+    if isinstance(features, dict):
+        features = features['words'], features['nwords']
+
     with Path(params['tags']).open() as f:
         indices = [idx for idx, tag in enumerate(f) if tag.strip() != 'O']
         num_tags = len(indices) + 1

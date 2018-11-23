@@ -58,6 +58,10 @@ def input_fn(words, tags, params=None, shuffle_and_repeat=False):
 
 
 def model_fn(features, labels, mode, params):
+    # For serving, features are a bit different
+    if isinstance(features, dict):
+        features = features['words'], features['nwords']
+
     # Read vocabs and inputs
     dropout = params['dropout']
     words, nwords = features
